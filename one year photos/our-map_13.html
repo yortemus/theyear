@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Our Map</title>
+
+<!--
+  HOW TO EDIT THIS PAGE
+  ======================
+  Everything you need to change lives in the LOCATIONS array below (search for
+  "EDIT YOUR LOCATIONS HERE"). For each stop, fill in:
+
+    name    - what you call the place ("The taco truck", "Her apartment")
+    date    - when it mattered ("March 14, 2025" or "Our first date")
+    lat/lng - the coordinates. Easiest way to get these: open Google Maps,
+              right-click the exact spot, click the coordinates that pop up
+              at the top of the menu to copy them (they copy as "lat, lng").
+    story   - a few sentences on why this place matters. Keep it short-ish;
+              it reads best as a paragraph or two.
+    photos  - a list of image filenames. Put your photo files in a folder
+              named "photos" right next to this HTML file, then list their
+              filenames here, e.g. "photos/beach-day.jpg". Leave the list
+              empty ([]) and it'll show a placeholder instead.
+
+  You can add or remove as many locations as you want - just copy/paste a
+  whole {...} block to add one, or delete one.
+
+  Also edit MAP_CENTER and MAP_ZOOM further down to point the map at your
+  city, and PAGE_TITLE / PAGE_SUBTITLE for the header text.
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+  :root{
+    --paper: #FBFAFC;
+    --paper-deep: #F0EDF5;
+    --ink: #23324A;
+    --ink-soft: #4B5B72;
+    --plum: #7C5CBF;
+    --plum-deep: #4F3480;
+    --lilac: #B9A2E0;
+    --line: rgba(35,50,74,0.18);
+  }
+
+  *{ box-sizing: border-box; }
+
+  html, body{
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    overflow: hidden;
+  }
+
+  #map{
+    position: absolute;
+    inset: 0;
+    background: var(--paper);
+  }
+
+  .leaflet-tile-pane{
+    filter: saturate(60%) brightness(1.02);
+  }
+
+  /* ---- header ---- */
+  .header{
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    z-index: 500;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 22px 30px;
+    pointer-events: none;
+  }
+  .header-inner{
+    pointer-events: auto;
+    background: rgba(246,239,226,0.88);
+    backdrop-filter: blur(6px);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 12px 20px;
+    box-shadow: 0 4px 16px rgba(35,50,74,0.08);
+  }
+  .header h1{
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: 22px;
+    margin: 0;
+    letter-spacing: 0.01em;
+    color: var(--ink);
+  }
+  .header p{
+    margin: 3px 0 0;
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 16px;
+    color: var(--plum-deep);
+    font-weight: 500;
+  }
+
+  .legend{
+    pointer-events: auto;
+    background: rgba(246,239,226,0.88);
+    backdrop-filter: blur(6px);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 10px 16px;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    color: var(--ink-soft);
+    align-self: flex-start;
+  }
+
+  /* ---- custom pin ---- */
+  .pin{
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .pin-mark{
+    width: 26px;
+    height: 26px;
+    border-radius: 50% 50% 50% 0;
+    background: var(--plum);
+    border: 2px solid var(--paper);
+    transform: rotate(-45deg);
+    box-shadow: 0 2px 6px rgba(35,50,74,0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  .pin-mark span{
+    transform: rotate(45deg);
+    color: var(--paper);
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 11px;
+  }
+  .pin:hover .pin-mark{
+    transform: rotate(-45deg) scale(1.12);
+    background: var(--plum-deep);
+  }
+  .pin.active .pin-mark{
+    background: var(--lilac);
+    transform: rotate(-45deg) scale(1.15);
+  }
+
+  /* ---- side panel ---- */
+  .panel-wrap{
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: 400px;
+    max-width: 92vw;
+    z-index: 600;
+    transform: translateX(100%);
+    transition: transform 0.35s cubic-bezier(0.22, 0.61, 0.36, 1);
+    pointer-events: none;
+  }
+  .panel-wrap.open{
+    transform: translateX(0);
+    pointer-events: auto;
+  }
+  .panel{
+    height: 100%;
+    background: var(--paper);
+    border-left: 1px solid var(--line);
+    box-shadow: -8px 0 30px rgba(35,50,74,0.15);
+    overflow-y: auto;
+    padding: 0 0 40px;
+  }
+
+  .panel-close{
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    justify-content: flex-end;
+    padding: 16px 18px 0;
+    background: linear-gradient(var(--paper) 60%, transparent);
+  }
+  .panel-close button{
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    color: var(--ink-soft);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 6px 12px;
+    cursor: pointer;
+  }
+  .panel-close button:hover{
+    border-color: var(--ink-soft);
+    color: var(--ink);
+  }
+
+  .panel-content{
+    padding: 4px 32px 0;
+  }
+
+  .stamp{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 68px;
+    height: 68px;
+    border: 2px dashed var(--lilac);
+    border-radius: 50%;
+    color: var(--plum-deep);
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-align: center;
+    line-height: 1.3;
+    transform: rotate(-8deg);
+    margin-bottom: 14px;
+    padding: 6px;
+  }
+
+  .panel h2{
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-style: italic;
+    font-size: 30px;
+    margin: 0 0 4px;
+    color: var(--ink);
+    line-height: 1.15;
+  }
+
+  .panel .when{
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 17px;
+    color: var(--plum-deep);
+    font-weight: 500;
+    margin: 0 0 22px;
+  }
+
+  .photo-grid{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .photo-grid .full{
+    grid-column: 1 / -1;
+  }
+  .photo{
+    aspect-ratio: 4 / 3;
+    border-radius: 3px;
+    border: 1px solid var(--line);
+    background: var(--paper-deep);
+    object-fit: cover;
+    width: 100%;
+    display: block;
+  }
+  .photo-placeholder{
+    aspect-ratio: 4 / 3;
+    border-radius: 3px;
+    border: 1.5px dashed var(--line);
+    background: var(--paper-deep);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    color: var(--ink-soft);
+    text-align: center;
+    padding: 6px;
+  }
+
+  .panel .story{
+    font-size: 16px;
+    line-height: 1.75;
+    color: var(--ink);
+  }
+  .panel .story p{ margin: 0 0 14px; }
+
+  .divider{
+    border: none;
+    border-top: 1px solid var(--line);
+    margin: 26px 0;
+  }
+
+  .nav-buttons{
+    display: flex;
+    justify-content: space-between;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+  }
+  .nav-buttons button{
+    background: transparent;
+    border: none;
+    padding: 8px 4px;
+    color: var(--ink-soft);
+    cursor: pointer;
+  }
+  .nav-buttons button:hover{
+    color: var(--plum-deep);
+  }
+
+  .leaflet-control-attribution{
+    font-family: 'Inter', sans-serif;
+    font-size: 10px;
+  }
+
+  @media (max-width: 640px){
+    .header{ padding: 14px 14px; }
+    .header-inner{ padding: 10px 14px; }
+    .header h1{ font-size: 18px; }
+    .legend{ display: none; }
+    .panel-content{ padding: 4px 22px 0; }
+  }
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div class="header">
+  <div class="header-inner">
+    <h1 id="page-title">Happy One Year, Zeynep &#128156;</h1>
+    <p id="page-subtitle">I love you</p>
+  </div>
+  <div class="legend">Tap a pin to open the story</div>
+</div>
+
+<div class="panel-wrap" id="panelWrap">
+  <div class="panel">
+    <div class="panel-close">
+      <button id="closeBtn">Close ✕</button>
+    </div>
+    <div class="panel-content">
+      <div class="stamp" id="stamp">STOP<br>01</div>
+      <h2 id="panelName">Location name</h2>
+      <p class="when" id="panelDate">the date</p>
+      <div class="photo-grid" id="panelPhotos"></div>
+      <div class="story" id="panelStory"></div>
+      <hr class="divider">
+      <div class="nav-buttons">
+        <button id="prevBtn">&larr; previous stop</button>
+        <button id="nextBtn">next stop &rarr;</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+
+  // =========================================================
+  // EDIT YOUR LOCATIONS HERE
+  // =========================================================
+
+  const PAGE_TITLE = "Happy One Year, Zeynep \uD83D\uDC9C";
+  const PAGE_SUBTITLE = "I love you";
+
+  // Center the map roughly where your locations are.
+  // Right now it's set near New York / Westchester as a placeholder.
+  const MAP_CENTER = [40.9, -73.8];
+  const MAP_ZOOM = 10;
+
+  const LOCATIONS = [
+    {
+      name: "Conte Forum",
+      date: "March 17, 2025",
+      lat: 42.33500, lng: -71.16750,
+      story: "The first stop. This is the day where it finally clicked for me, and I realized that I might actually like you. It had been brewing since before then, though. I remember Jiahan asking me if I would marry you, after we talked about the BC marriage statistic. That question really stuck in my mind for the rest of that day. When Jiahan, Austin, Johanna and Christiana all got off the ice, we skated a few laps together, and I fell many times. Even though I was obviously a bit embarassed, I loved the smile on your face and the sound of your laugh everytime I hit the ground.",
+      photos: ["photos/conte1.mov", "photos/conte2.jpg", "photos/conte3.jpg", "photos/conte4.jpg"]
+    },
+    {
+      name: "McMullen Museum of Art",
+      date: "April 25, 2025",
+      lat: 42.33520, lng: -71.16960,
+      story: "This is where AC Formal was at the end of our freshman year. At this point, I had already started to develop feelings for you. I would constantly look at the photos we took together on that roof- where I had my arm around you and you leaned on me- and wonder if the body language suggested that we were something more.",
+      photos: ["photos/Mcmullen1.jpg", "photos/mcmullen2.jpg", "photos/mcmullen3.jpg"]
+    },
+    {
+      name: "Swings at Riverside Park",
+      date: "May 26, 2025",
+      lat: 40.77760, lng: -73.98982,
+      story: "This was our first hangout in NYC over the summer. I was at Spencer Kolker's house in CT a couple days before this, and I had a late night talk with Krish about you, and I told him about our plans. I remember telling you about Riverside Park, which was sort of across the river from your park. It's a really quiet place with a nice view, so I thought it would be pretty romantic and start to put ideas in your mind. We'd talked about it before, but I brought it up again, and said you should come see the river from the NYC side (an intentional excuse to hang out with you). My plan was to keep bringing you to semi-romantic spots and not make an obvious move, and let the feelings brew themselves. Eventually we made the plans, and I took you to the park. I still look back on the timelapse from the swings- I think it's the cutest thing.    ",
+      photos: ["photos/riversideswings1.jpg", "photos/riversideswings1.mov", "photos/riversideswings2.jpg"]
+    },
+    {
+      name: "Baja Soju Tasting Center",
+      date: "May 26, 2025",
+      lat: 40.78163, lng: -73.98807,
+      story: "I brought you here on the same night we were on the swings. This was the more romantic part of the night, even if we were still goofing off (I thought sitting right over the water would be a nice spot). This was also the beginning of our drink mixes. As you know, I came up with the drink combination idea because I thought it would be a fun way to spend time and laugh together (at how bad they were), and also give us a reason for us to hang out again and try another new drink. I feel like I definitely hit you up a few more times over the summer to ask 'yo, when we trying the next drink?'. ",
+      photos: ["photos/bajasojutasting1.jpg", "photos/bajasojutasting2.mov"]
+    },
+    {
+      name: "Sharks Pool Club",
+      date: "June 21, 2025",
+      lat: 40.71240, lng: -73.99460,
+      story: "I'm so glad we found this place. This gave us a new place to hang out privately, play pool together, and also try our drinks indoors. We tried the MatchIPA the first time we came here (mid asf). At this point we'd hung out a few times and facetimed pretty often, so I feel like things were starting to brew and I decided to maybe try and be a litte bit more romantic, but very subtly. You had mentioned you weren't great at pool beforehand, and I remember coming up with the idea to hold you from behind and help you with your form. My heart was beating out of my chest as I walked up to you to do it, and I had no idea what you thought when I did do it. All I knew is that you didn't shift or pull away or seem super uncomfortable, so I just prayed that I didn't blunder. ",
+      photos: ["photos/Sharks1.MP4", "photos/sharks2.jpg", "photos/sharks3.JPG", "photos/sharks4.JPG"]
+    },
+    {
+      name: "Ross Dock Picnic Area",
+      date: "July 10, 2025",
+      lat: 40.86135, lng: -73.95434,
+      story: "This was the day we went to Edgewater and watched movies in the grass. I figured that it was time I came to Jersey. I remmeber getting picked up in the city, and being surprised that you brought blankets to lay on. I took that as a really good sign, because when I was on the train into NYC, I was wondering if I should ask you to bring a blanket to lay on. I thought laying on a blanket together in the park was pretty romantic and couple-y, but eventually I decided not to ask you because I was anxious about being too romantic. I really really wanted to be as subtle as possible. So, when you told me you brought blankets to lay on, I was so happy you have no idea. We tried the mango and plain sake this day, and watched 2 movies (I feel like one of them was Grown Ups or some other Adam Sandler movie, and I can't remember the other to be honest. I even checked Letterboxd but we never put it in). I also remember walking over to the water, and trying to get you to joun me. You'd shown me a photo of you and your sister sitting on the rocks by the water, and I really wanted to do that with you. I kept commenting on how nice the view was, and how I felt like sitting on the rocks would be nice, but you just said 'yeah it's nice' and didn't bite. Unlucky. Anyway, somewhere along the way, I guess you saw me acting all autistic with an ant on the grass and knew you had developed feelings for me. ",
+      photos: ["photos/rossdock1.jpg", "photos/rossdock2.jpg", "photos/rossdock3.jpg"]
+    },
+    {
+      name: "Sushi Cruise",
+      date: "July 10, 2025",
+      lat: 40.81130, lng: -73.97620,
+      story: "This is the same day we watched the movies on the grass. I was really happy we got a table outside with a nice view across the river. I also knew I needed to start locking in and bag that, so I also paid for our dinner. I remember Krish texted me during dinner asking what I was doing in Jersey (he knew why I was there before asking obviously), and I sent him a photo of the view nad excitedly told him about how the day went. ",
+      photos: ["photos/sushicruise1.jpg", "photos/sushicruise2.jpg"]
+    },
+    {
+      name: "American Dream Mall",
+      date: "July 26, 2025",
+      lat: 40.81000, lng: -74.06750,
+      story: "This was originally going to be a beach trip, but the weather wasn't great. I had made plans with Zach, Justin, Krish, Austin, Elise, Johanna, and Olivia. At this point I was so desperate to find time to hang out wih you because I was already so down bad. So I invited you to come along, and hopefully give you a better introduction to my friends. My plan was honestly just to talk to you the whole time and let my friends hang out with each other. Anyway, it ended up being a trip to American Dream, and then Elise's house. Everybody else in the car knew I liked you except for you, and I remember it was so frustrating when Krish called shotgun and sat in the passenger seat. He sat in the back when we were leaving, but for some reason you still kept insisting on sitting in the back. Maybe it was because you felt out of place with my friends? But either way, I was so worried during this because I took you not wanting to sit in the passenger seat as a bad sign. As you can tell, throughout the Summer, I would read into EVERY single little detail, and overthink. At the end of the day, I just really wanted you to like me back. ",
+      photos: ["photos/americandream1.jpg", "photos/americandream2.jpg"]
+    },
+    {
+      name: "Belvedere Castle",
+      date: "August 3, 2025",
+      lat: 40.77997, lng: -73.96770,
+      story: "I put down August 3, but I took you there on June 16 as well. I just think that this night at the castle was so much more impactful. I fully think that this was my favorite night/day of the whole summer. Not just with you, but in general. I had so so so much fun. We had a picnic in Central Park this day, went to Chick Fil A and drew on each other's hands. I know you showed your friends a photo of your hand after, but why didn't you tell them I drew it?? I was worried I found out you didn't tell them about our day and the fact that the drawing on your hand was done by ME. At this point, I was also worried because you never told your friends about our hangouts, and I felt like this was the type of stuff girls would talk/gossip about. After we drew on each other's hands, we sat by the castle, but this time on the other side of the pond. We tied our laces together and tried to walk and run, and also laid down in the grass, looking up at the stars and listening to music. I fell so deeply into love this day. I don't really know how it felt for you, but I could not stop thinking about you and your voice after this night. On the train home, I remember watching the videos back a million times just to hear the sound of your laugh. I couldn't even sleep that night. Just writing about this night right now makes my heart feel warm. I knew I already truly liked you, but after this night I knew I had fully fallen in love with you. I was lowkey obsessed lmao ",
+      photos: ["photos/belvedere1.mov", "photos/belvedere2.mov", "photos/belvedere3.mov", "photos/belvedere3.jpg", "photos/belvedere4.jpg", "photos/belvedere5.jpg", "photos/belvedere6.jpg"]
+    },
+    {
+      name: "The Beehive",
+      date: "August 30, 2025",
+      lat: 42.34280, lng: -71.06980,
+      story: "This was our first proper hangout/date once we got back to school. Some time over the summer, you sent me a tiktok about jazz bars, and I thought it was the perfect opportunity for a romantic date. So, I responded telling you that I've always wanted to go to one too (I like jazz but honestly had never once thought about going to a jazz bar before LMAO), and that we should go to one together. I was so scared about whether you liked me back or not, but I knew that after the summer we had together, I needed to start getting romantic. I'm being so serious, there was so much strategy and thought behind literally every hangout and conversation. You decided to get a dress on Amazon, and I wore a suit. While I was getting ready, I needed to borrow dress shoes from one of my roommates. I was getting ready in Zach's room, with Zach, Klara, Austin, Nick and Justin all crowded around while I told them all about you, and we crafted a game plan. I told them about my birthday gift ideas for you, and showed them the star which had already arrived. I think they could tell how serious I was about you.  I was considering popping the question this night, thinking there would be a nice, quiet, romantic moment after the dinner to ask you, but I didn't get the chance to because you really wanted to go home after the dinner. I didn't have it in me to say 'Before we go home, there's something I wanted to talk to you about.'  ",
+      photos: []
+    },
+    {
+      name: "Boston Common (Ether Monument)",
+      date: "September 13, 2025",
+      lat: 42.35485, lng: -71.07136,
+      story: "I hope I got the coordinates for the exact statue right, but this is the night I confessed to you. We went to Turkish Lazuri for dinner, and since the Esplanade was closed this day (I was deadass FURIOUS about this by the way, I had a whole plan to ask you there), we went to the Commons. We walked a little bit, sat on a few benches, but I was too nervous to pull the trigger and ask you. I knew I needed to ask you this night, but I kept stalling. Eventually, as it got cold and you wanted to go home, I knew I had to just do it. I told you that I needed to talk to you about something, and we re-entered the park. I didn't think I hid my anxiety well, but the way you describe it, it's clear shit was NOT hidden AT ALL. I didn't think it was that cold, but in that moment I was shivering and sweating. My heart dropped right before I told you- so low that I felt like it dropped into my balls. In the moment though, I mustered up the courage by remembering that after the summer, the dates, you sleeping over in my bed, keeping my pyjamas, buying a dress and going to a jazz bar with me, if you still didn't like me after all of that, I would know that I did everything I could've, and that I probably would never have had a chance anyway. I do think I hid my excitement well after you told me you felt the same way. I felt like a little kid and wanted to jump up and down with joy. You probably remember I called Krish while you were in the bathroom. I wanted to make our relationship official when we got home, but you probably also remember nosy Jiahan waiting in the living room for us.  ",
+      photos: []
+    },
+    {
+      name: "Chestnut Hill Reservoir",
+      date: "September 18, 2025",
+      lat: 42.33428, lng: -71.15435,
+      story: "This was the night we made it official, and I brought you back to your dorm for your birthday surprise. We went on a walk around the Res, and we sat on the rocks in our little spot on the other side. We talked about what we wanted us to be, and once we agreed, I made the horrible mistake of saying 'shit guess we're a couple then'. Silly me. You then made me ask, and I made ANOTHER horrible mistake by asking you to be my girlfriend. I'm glad you forced me to ask you out the right way- I like that you don't settle, I think it was really cute.  ",
+      photos: ["photos/reservoire1.jpg"]
+    },
+    {
+      name: "The Clayroom",
+      date: "October 4, 2025",
+      lat: 42.341366, lng: -71.12536,
+      story: "This was one of our first dates as a couple. I was so excited to finally have a nice, proper, hangout where both of us knew it was a date. If I remember correctly, the few weeks after we made it official were incredibly busy for you, so this was one of our first chances to spend quality time together. I love the ceramics we made and keep my bowl full of small reminders of memories we've made over the course of the last year. I hope I get to keep filling that bowl for the rest of my life :)",
+      photos: ["photos/clayroom1.jpg", "photos/clayroom2.jpg", "photos/clayroom3.jpg"]
+    },
+    {
+      name: "Puopolo Field",
+      date: "November 15, 2025",
+      lat: 42.36835, lng: -71.05517,
+      story: "We went to Nico this night for our 2 month anniversary. The dinner was already amazing, and I still remember the walk we went on afterwards. This pin is (my best guess at) the exact location we took our photos in the rain under your red scarf. I really enjoyed the walk we went on after dinner.  ",
+      photos: ["photos/puopolo1.jpg", "photos/puopolo2.jpg", "photos/puopolo3.jpg", "photos/puopolo4.jpg", "photos/puopolo5.jpg", "photos/puopolo6.jpg"]
+    },
+    {
+      name: "Memory Shop (Newbury)",
+      date: "November 20, 2025",
+      lat: 42.34917, lng: -71.08417,
+      story: "Memory Shop is one place that we've been consistently coming back to since we first went in November. I absolutely love the album that you got me, and every so often I will flip through the pages, looking at all of our past photo booth trips. I want to fill this album and hopefully many more with you over the years. I feel like this is something we could show our kids all the way down the line. I hope we get to.",
+      photos: ["photos/memoryshopnewbury1.jpg"]
+    },
+    {
+      name: "The Roof",
+      date: "November 26, 2025",
+      lat: 40.71800, lng: -73.99000,
+      story: "This is the roof I took you over Thanksgiving break. We were already dating, but I really wanted to impress you still and I thought this was a nice spot to take you to. I love the timelapse and the photos we took together.",
+      photos: ["photos/roof1.mov", "photos/roof2.jpg", "photos/roof3.jpg", "photos/roof4.jpg", "photos/roof5.jpg"]
+    },
+    {
+      name: "Boston Public Library",
+      date: "December 6, 2025",
+      lat: 42.34998, lng: -71.07654,
+      story: "This is probably a more important spot for me than it is for you, since you come here all the time. Regardless, I love all of our study dates here, and going to get coffee or Cava during our breaks. Sometimes I would agree to a study date even if I had no work, just so I could sit across the table from you for hours. Even when I did have work, I got nothing done because I'd just be staring at you while you did your work. I love the way you look when you're focused.",
+      photos: ["photos/publiclibrary1.jpg", "photos/publiclibrary2.jpg", "photos/publiclibrary3.jpg", "photos/publiclibrary4.jpg"]
+    },
+    {
+      name: "Edgewater",
+      date: "January 10, 2026",
+      lat: 40.81265, lng: -73.98169,
+      story: "I don't need to elaborate on this- the car.",
+      photos: []
+    },
+    {
+      name: "Memory Shop (Cambridge)",
+      date: "January 30, 2026",
+      lat: 42.37210, lng: -71.11920,
+      story: "We came here on my 20th birthday. Originally, we planned to go to see the glass plants exhibit at the Harvard Museum of Natural History, but we didn't realize that it was closed. In the freezing cold, we hurried to Memory Shop. I didn't do anything crazy for my birthday, but I the way I celebrated this one will live in my memory forever because of the amazing, wonderful, sweet, kind, smart girl that I spent it with.",
+      photos: ["photos/memoryshopcambridge1.jpg", "photos/memoryshopcambridge2.jpg", "photos/memoryshopcambridge3.jpg", "photos/memoryshopcambridge4.jpg"]
+    },
+    {
+      name: "Ocean Prime",
+      date: "February 13, 2026",
+      lat: 42.351416, lng: -71.043184,
+      story: "This is where I took you on Valentine's Day! Or technically the day before. I remember I could only take you for dinner on the 13th, because my show was the next night and you had Galentine's in the morning/afternoon of the 14th. (Galentines' for single people btw hopefully I get to take you out on the actual day this year!) It was really cold this day so you didn't want to take pictures, but we did review a cookie together. I love the way you look at me when we take our bites together (I have that moment screenshotted)",
+      photos: ["photos/oceanprime1.jpg", "photos/oceanprime2.jpg"]
+    },
+    {
+      name: "TD Garden",
+      date: "April 8, 2026",
+      lat: 42.36639, lng: -71.06222,
+      story: "We came here for the Neighborhood concert. I was so happy to finally go to a proper concert with you, even if we couldn't be up too late afterwards. I was so geeked the entire night because of your fit- I thought you looked amazing. Was so sad that we couldn't spend more time together after the concert ended, but this was still one of my favorite dates we've ever been on.",
+      photos: ["photos/tdgarden1.jpg", "photos/tdgarden2.jpg", "photos/tdgarden3.jpg", "photos/tdgarden4.jpg", "photos/tdgarden5.jpg"]
+    },
+    {
+      name: "Sarma",
+      date: "April 29, 2026",
+      lat: 42.38000, lng: -71.09750,
+      story: "I feel like this dinner wasn't super impactful and it's not a super important event in the context of our relationship, but I find it really memorable. I remember we were on the first floor of O'Neill on a Tuesday, and we realized we were both free the next night with not much work to do. We decided spontaneously to book a dinner for the next night, and I was somehow able to get one at Sarma (normally booked out a month in advance, but someone must've dropped their reservation right before we checked). I really enjoyed this dinner- the food was amazing, the music was amazing, and you looked even better. I'm sorry for getting a little bit too caught up in the music, it was really good. If it means anything, I didn't take my eyes off you at all the entire night. ",
+      photos: ["photos/sarma1.jpg", "photos/sarma2.jpg", "photos/sarma3.jpg"]
+    },
+    {
+      name: "Mitsuwa",
+      date: "May 16, 2026",
+      lat: 40.81681, lng: -73.97945,
+      story: "First time in the car was NOT a good idea.",
+      photos: []
+    }
+  ];
+
+  // =========================================================
+  // You shouldn't need to touch anything below this line.
+  // =========================================================
+
+  document.getElementById('page-title').textContent = PAGE_TITLE;
+  document.getElementById('page-subtitle').textContent = PAGE_SUBTITLE;
+
+  const map = L.map('map', { zoomControl: false }).setView(MAP_CENTER, MAP_ZOOM);
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+  // Paste your free CARTO API key here (from carto.com/basemaps/apikey)
+  const CARTO_API_KEY = "cb1_31sf_1_8d4fbde684c663067a0280bb";
+
+  L.tileLayer('https://basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}.png?key=' + CARTO_API_KEY, {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+  }).addTo(map);
+
+  const panelWrap = document.getElementById('panelWrap');
+  const panelName = document.getElementById('panelName');
+  const panelDate = document.getElementById('panelDate');
+  const panelStory = document.getElementById('panelStory');
+  const panelPhotos = document.getElementById('panelPhotos');
+  const stamp = document.getElementById('stamp');
+
+  let markers = [];
+  let currentIndex = 0;
+
+  function buildIcon(number, active){
+    return L.divIcon({
+      className: '',
+      html: `<div class="pin${active ? ' active' : ''}"><div class="pin-mark"><span>${number}</span></div></div>`,
+      iconSize: [34, 34],
+      iconAnchor: [17, 30]
+    });
+  }
+
+  function renderPhotos(photos){
+    panelPhotos.innerHTML = '';
+    if (!photos || photos.length === 0){
+      for (let i = 0; i < 2; i++){
+        const div = document.createElement('div');
+        div.className = 'photo-placeholder';
+        div.textContent = 'Add a photo';
+        panelPhotos.appendChild(div);
+      }
+      return;
+    }
+    photos.forEach((src, i) => {
+      const img = document.createElement('img');
+      img.className = 'photo' + (photos.length % 2 === 1 && i === photos.length - 1 ? ' full' : '');
+      img.src = src;
+      img.alt = '';
+      img.onerror = function(){
+        const div = document.createElement('div');
+        div.className = 'photo-placeholder';
+        div.textContent = 'Photo not found: ' + src;
+        img.replaceWith(div);
+      };
+      panelPhotos.appendChild(img);
+    });
+  }
+
+  function openPanel(index){
+    currentIndex = index;
+    const loc = LOCATIONS[index];
+    stamp.innerHTML = 'STOP<br>' + String(index + 1).padStart(2, '0');
+    panelName.textContent = loc.name;
+    panelDate.textContent = loc.date;
+    panelStory.innerHTML = '<p>' + loc.story.split('\n\n').join('</p><p>') + '</p>';
+    renderPhotos(loc.photos);
+    panelWrap.classList.add('open');
+
+    markers.forEach((m, i) => m.setIcon(buildIcon(i + 1, i === index)));
+    map.panTo([loc.lat, loc.lng]);
+  }
+
+  function closePanel(){
+    panelWrap.classList.remove('open');
+    markers.forEach((m, i) => m.setIcon(buildIcon(i + 1, false)));
+  }
+
+  document.getElementById('closeBtn').addEventListener('click', closePanel);
+  document.getElementById('prevBtn').addEventListener('click', () => {
+    openPanel((currentIndex - 1 + LOCATIONS.length) % LOCATIONS.length);
+  });
+  document.getElementById('nextBtn').addEventListener('click', () => {
+    openPanel((currentIndex + 1) % LOCATIONS.length);
+  });
+
+  LOCATIONS.forEach((loc, i) => {
+    const marker = L.marker([loc.lat, loc.lng], { icon: buildIcon(i + 1, false) }).addTo(map);
+    marker.on('click', () => openPanel(i));
+    markers.push(marker);
+  });
+
+  if (LOCATIONS.length > 0){
+    const bounds = L.latLngBounds(LOCATIONS.map(l => [l.lat, l.lng]));
+    map.fitBounds(bounds, { padding: [80, 80] });
+  }
+
+</script>
+
+</body>
+</html>
