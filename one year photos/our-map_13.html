@@ -260,7 +260,7 @@
   .photo-grid .full{
     grid-column: 1 / -1;
   }
-  .photo{
+    .photo{
     aspect-ratio: 4 / 3;
     border-radius: 3px;
     border: 1px solid var(--line);
@@ -268,6 +268,68 @@
     object-fit: cover;
     width: 100%;
     display: block;
+    cursor: pointer;
+  }
+
+  .photo-wrap{
+    position: relative;
+    cursor: pointer;
+  }
+
+  .photo-wrap .play-icon{
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.55);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    pointer-events: none;
+  }
+
+  .lightbox{
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 18, 26, 0.92);
+    z-index: 1000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 30px;
+  }
+  .lightbox.open{
+    display: flex;
+  }
+  .lightbox-content img,
+  .lightbox-content video{
+    max-width: 100%;
+    max-height: 85vh;
+    display: block;
+    border-radius: 4px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  }
+  .lightbox-close{
+    position: absolute;
+    top: 20px;
+    right: 24px;
+    color: #fff;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.4);
+    border-radius: 3px;
+    padding: 6px 12px;
+    cursor: pointer;
+  }
+  .lightbox-close:hover{
+    border-color: #fff;
+  }
   }
   .photo-placeholder{
     aspect-ratio: 4 / 3;
@@ -358,6 +420,11 @@
       </div>
     </div>
   </div>
+</div>
+
+<div class="lightbox" id="lightbox">
+  <button class="lightbox-close" id="lightboxClose">Close ✕</button>
+  <div class="lightbox-content" id="lightboxContent"></div>
 </div>
 
 <script>
@@ -579,6 +646,40 @@
     return /\.(mp4|mov|webm|m4v)$/i.test(src);
   }
 
+  const lightbox = document.getElementById('lightbox');
+  const lightboxContent = document.getElementById('lightboxContent');
+  const lightboxClose = document.getElementById('lightboxClose');
+
+  function openLightbox(src, isVid){
+    lightboxContent.innerHTML = '';
+    if (isVid){
+      const video = document.createElement('video');
+      video.src = src;
+      video.controls = true;
+      video.autoplay = true;
+      lightboxContent.appendChild(video);
+    } else {
+      const img = document.createElement('img');
+      img.src = src;
+      img.alt = '';
+      lightboxContent.appendChild(img);
+    }
+    lightbox.classList.add('open');
+  }
+
+  function closeLightbox(){
+    lightbox.classList.remove('open');
+    lightboxContent.innerHTML = '';
+  }
+
+  lightboxClose.addEventListener('click', closeLightbox);
+  lightbox.addEventListener('click', function(e){
+    if (e.target === lightbox) closeLightbox();
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') closeLightbox();
+  });
+
   function renderPhotos(photos){
     panelPhotos.innerHTML = '';
     if (!photos || photos.length === 0){
@@ -592,32 +693,42 @@
     }
     photos.forEach((src, i) => {
       const isLast = photos.length % 2 === 1 && i === photos.length - 1;
+      const wrap = document.createElement('div');
+      wrap.className = 'photo-wrap' + (isLast ? ' full' : '');
+
       if (isVideo(src)){
         const video = document.createElement('video');
-        video.className = 'photo' + (isLast ? ' full' : '');
+        video.className = 'photo';
         video.src = src;
-        video.controls = true;
+        video.muted = true;
         video.preload = 'metadata';
         video.onerror = function(){
           const div = document.createElement('div');
           div.className = 'photo-placeholder';
           div.textContent = 'Video not found: ' + src;
-          video.replaceWith(div);
+          wrap.replaceWith(div);
         };
-        panelPhotos.appendChild(video);
+        const playIcon = document.createElement('span');
+        playIcon.className = 'play-icon';
+        playIcon.textContent = '▶';
+        wrap.appendChild(video);
+        wrap.appendChild(playIcon);
+        wrap.addEventListener('click', () => openLightbox(src, true));
       } else {
         const img = document.createElement('img');
-        img.className = 'photo' + (isLast ? ' full' : '');
+        img.className = 'photo';
         img.src = src;
         img.alt = '';
         img.onerror = function(){
           const div = document.createElement('div');
           div.className = 'photo-placeholder';
           div.textContent = 'Photo not found: ' + src;
-          img.replaceWith(div);
+          wrap.replaceWith(div);
         };
-        panelPhotos.appendChild(img);
+        wrap.appendChild(img);
+        wrap.addEventListener('click', () => openLightbox(src, false));
       }
+      panelPhotos.appendChild(wrap);
     });
   }
 
