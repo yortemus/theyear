@@ -575,6 +575,10 @@
     });
   }
 
+  function isVideo(src){
+    return /\.(mp4|mov|webm|m4v)$/i.test(src);
+  }
+
   function renderPhotos(photos){
     panelPhotos.innerHTML = '';
     if (!photos || photos.length === 0){
@@ -587,17 +591,33 @@
       return;
     }
     photos.forEach((src, i) => {
-      const img = document.createElement('img');
-      img.className = 'photo' + (photos.length % 2 === 1 && i === photos.length - 1 ? ' full' : '');
-      img.src = src;
-      img.alt = '';
-      img.onerror = function(){
-        const div = document.createElement('div');
-        div.className = 'photo-placeholder';
-        div.textContent = 'Photo not found: ' + src;
-        img.replaceWith(div);
-      };
-      panelPhotos.appendChild(img);
+      const isLast = photos.length % 2 === 1 && i === photos.length - 1;
+      if (isVideo(src)){
+        const video = document.createElement('video');
+        video.className = 'photo' + (isLast ? ' full' : '');
+        video.src = src;
+        video.controls = true;
+        video.preload = 'metadata';
+        video.onerror = function(){
+          const div = document.createElement('div');
+          div.className = 'photo-placeholder';
+          div.textContent = 'Video not found: ' + src;
+          video.replaceWith(div);
+        };
+        panelPhotos.appendChild(video);
+      } else {
+        const img = document.createElement('img');
+        img.className = 'photo' + (isLast ? ' full' : '');
+        img.src = src;
+        img.alt = '';
+        img.onerror = function(){
+          const div = document.createElement('div');
+          div.className = 'photo-placeholder';
+          div.textContent = 'Photo not found: ' + src;
+          img.replaceWith(div);
+        };
+        panelPhotos.appendChild(img);
+      }
     });
   }
 
